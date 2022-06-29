@@ -3,74 +3,72 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
+using System.IO;
 
 public class MainManager : MonoBehaviour
 {
-    public Brick BrickPrefab;
-    public int LineCount = 6;
-    public Rigidbody Ball;
+    // Static = if multiple instances of MainManager, If any of those MainManagers changed the value in it, it would also be changed for the others.
+    public static MainManager Instance;
+    public string Name; // Get in menu
 
-    public Text ScoreText;
-    public GameObject GameOverText;
-    
-    private bool m_Started = false;
-    private int m_Points;
-    
-    private bool m_GameOver = false;
+    public string BestName = "Name"; // Get from last session
+    public int BestScore = 0; // Get from last session
 
-    
-    // Start is called before the first frame update
-    void Start()
+
+    private void Awake()
     {
-        const float step = 0.6f;
-        int perLine = Mathf.FloorToInt(4.0f / step);
-        
-        int[] pointCountArray = new [] {1,1,2,2,5,5};
-        for (int i = 0; i < LineCount; ++i)
+        // Singleton = ensure that only a single instance of the MainManager can ever exist
+        if (Instance != null)
         {
-            for (int x = 0; x < perLine; ++x)
-            {
-                Vector3 position = new Vector3(-1.5f + step * x, 2.5f + i * 0.3f, 0);
-                var brick = Instantiate(BrickPrefab, position, Quaternion.identity);
-                brick.PointValue = pointCountArray[i];
-                brick.onDestroyed.AddListener(AddPoint);
-            }
+            Destroy(gameObject);
+            return;
         }
+
+        Instance = this;
+        DontDestroyOnLoad(gameObject);
     }
 
-    private void Update()
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    // Serializable needed to use JSON on the data
+    [System.Serializable]
+    class SavedData
     {
-        if (!m_Started)
-        {
-            if (Input.GetKeyDown(KeyCode.Space))
-            {
-                m_Started = true;
-                float randomDirection = Random.Range(-1.0f, 1.0f);
-                Vector3 forceDir = new Vector3(randomDirection, 1, 0);
-                forceDir.Normalize();
-
-                Ball.transform.SetParent(null);
-                Ball.AddForce(forceDir * 2.0f, ForceMode.VelocityChange);
-            }
-        }
-        else if (m_GameOver)
-        {
-            if (Input.GetKeyDown(KeyCode.Space))
-            {
-                SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
-            }
-        }
+        public string Username;
+        public int Score;
     }
 
-    void AddPoint(int point)
+    public void SaveData(int points)
     {
-        m_Points += point;
-        ScoreText.text = $"Score : {m_Points}";
+        SavedData data = new SavedData();
+        data.Username = Name;
+        data.Score = points;
+
+        string json = JsonUtility.ToJson(data);
+
+        File.WriteAllText(Application.persistentDataPath + "/savefile.json", json);
     }
 
-    public void GameOver()
+    public void LoadData()
     {
-        m_GameOver = true;
-        GameOverText.SetActive(true);
+        string path = Application.persistentDataPath + "/savefile.json";
+        if (File.Exists(path))
+        {
+            string json = File.ReadAllText(path);
+            SavedData data = JsonUtility.FromJson<SavedData>(json);
+
+            BestName = data.Username;
+            BestScore = data.Score;
+
+        }
+    }
+    public void ResetData()
+    {
+        SavedData data = new SavedData();
+        data.Username = "Name";
+        data.Score = 0;
+
+        string json = JsonUtility.ToJson(data);
+
+        File.WriteAllText(Application.persistentDataPath + "/savefile.json", json);
     }
 }
